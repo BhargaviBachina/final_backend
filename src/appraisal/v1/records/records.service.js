@@ -29,17 +29,26 @@ exports.processCSV = async (file, userId) => {
       .on('error', reject);
   });
 
-
   // Insert records into the database
   await db('records').insert(records);
 
   // Clean up the uploaded file after processing
   fs.unlinkSync(file.path);
 
-  return { sessionId };
+  return { sessionId };  // Return the sessionId for the frontend to store in localStorage
 };
 
 exports.fetchRecords = async (userId, { sessionId, searchField, searchValue, page = 1, perPage = 10 }) => {
+  // If no sessionId is passed, get the most recent sessionId for the user
+  if (!sessionId) {
+    const latestSession = await db('records')
+      .where('user_id', userId)
+      .orderBy('timestamp', 'desc')  // Order by timestamp to get the most recent session
+      .first();  // Fetch the latest record (session)
+    
+    sessionId = latestSession ? latestSession.session_id : null;  // Get the most recent sessionId
+  }
+
   // Ensure valid pagination values
   page = parseInt(page.trim(), 10) || 1;
   perPage = parseInt(perPage.trim(), 10);
