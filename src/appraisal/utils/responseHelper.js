@@ -5,4 +5,4 @@ exports.sendResponse = (res, statusCode, message, data = null) => {
       data,
     });
   };
-  
+

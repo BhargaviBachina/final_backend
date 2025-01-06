@@ -8,3 +8,5 @@ exports.log = (message) => {
   const logMessage = `[${timestamp}] ${message}\n`;
   fs.appendFileSync(logFilePath, logMessage);
 };
+
+
