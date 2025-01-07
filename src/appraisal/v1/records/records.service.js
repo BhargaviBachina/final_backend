@@ -213,7 +213,8 @@ exports.fetchRecords = async (userId, { sessionId, searchField, searchValue, pag
     .where('user_id', userId)
     .where('session_id', sessionId) // Ensure we filter by the current session
     .limit(perPage)
-    .offset(offset);
+    .offset(offset)
+    .select('id', 'user_id', 'session_id', 'timestamp', 'data');
 
   // Apply search filters if provided
   if (searchField && searchValue !== undefined) {
