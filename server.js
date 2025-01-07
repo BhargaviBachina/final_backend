@@ -10,8 +10,8 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Routes
-const authRoutes = require('./src/appraisal/v1/auth/auth.routes');
-const recordsRoutes = require('./src/appraisal/v1/records/records.routes');
+const authRoutes = require('./src/appraisal/v1/auth/routes/auth.routes');
+const recordsRoutes = require('./src/appraisal/v1/records/routes/records.routes');
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/records', recordsRoutes);
 

@@ -1,8 +1,7 @@
-const db = require('../../../../config/knex');
-const { hashPassword, comparePassword, generateToken } = require('./auth.utils');
+const db = require('../../../../../config/knex');
+const { hashPassword, comparePassword, generateToken } = require('../utils/auth.utils');
 const fs = require('fs');
-const csv = require('csv-parser');
-const { v4: uuidv4 } = require('uuid');
+
 
 // Register user
 exports.register = async ({ username, email, password, phoneNumber, gender, dob }) => {

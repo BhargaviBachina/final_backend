@@ -1,8 +1,8 @@
 const express = require('express');
 const multer = require('multer');
-const { uploadCSV, fetchRecords } = require('./records.controller');
-const { validateCSVUpload, validateFetchRecords } = require('./dto/records.dto');
-const { verifyToken } = require('../../helpers/authMiddleware');
+const { uploadCSV, fetchRecords } = require('../controllers/records.controller');
+const { validateCSVUpload, validateFetchRecords } = require('../validations/records.validation');
+const { verifyToken } = require('../../../helpers/authMiddleware');
 
 const upload = multer({ dest: 'uploads/' });
 const router = express.Router();

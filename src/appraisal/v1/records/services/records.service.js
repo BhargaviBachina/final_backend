@@ -1,36 +1,24 @@
-const db = require('../../../../config/knex');
+const db = require('../../../../../config/knex');
 const fs = require('fs');
 const csv = require('csv-parser');
 const { v4: uuidv4 } = require('uuid');
+const { parseCSV } = require('../utils/records.utils');  // Import the parseCSV function from records.utils.js
 
 exports.processCSV = async (file, userId) => {
-  const records = [];
-  const sessionId = uuidv4();  // Create a new session ID
+  const sessionId = uuidv4();  
 
-  // Read and parse the CSV file
-  await new Promise((resolve, reject) => {
-    fs.createReadStream(file.path)
-      .pipe(csv())
-      .on('data', (row) => {
-        try {
-          // Ensure each row is converted to a proper JSON string
-          const jsonData = JSON.stringify(row);  // Ensure this row is a valid JSON string
-          records.push({
-            user_id: userId,
-            session_id: sessionId,
-            timestamp: new Date(),
-            data: jsonData,  // Store the row data as a JSON string
-          });
-        } catch (error) {
-          console.error('Error processing row:', error);
-        }
-      })
-      .on('end', resolve)
-      .on('error', reject);
-  });
+  const records = await parseCSV(file.path);
+
+  // Format records into the required structure before inserting them into the DB
+  const formattedRecords = records.map((row) => ({
+    user_id: userId,
+    session_id: sessionId,
+    timestamp: new Date(),
+    data: JSON.stringify(row),  // Convert each row to JSON string
+  }));
 
   // Insert records into the database
-  await db('records').insert(records);
+  await db('records').insert(formattedRecords);
 
   // Clean up the uploaded file after processing
   fs.unlinkSync(file.path);
@@ -50,8 +38,8 @@ exports.fetchRecords = async (userId, { sessionId, searchField, searchValue, pag
   }
 
   // Ensure valid pagination values
-  page = parseInt(page.trim(), 10) || 1;
-  perPage = parseInt(perPage.trim(), 10);
+  page = parseInt(page, 10) || 1;
+  perPage = parseInt(perPage, 10);
 
   if (isNaN(page) || page <= 0) {
     throw new Error('Page must be a positive integer');
@@ -78,16 +66,23 @@ exports.fetchRecords = async (userId, { sessionId, searchField, searchValue, pag
     query = query.whereRaw('JSON_UNQUOTE(JSON_EXTRACT(data, ?)) LIKE ?', [`$.${searchField}`, `${searchValue}%`]);
   }
 
-  // Fetch records from the database
+  // Fetch filtered records from the database (if any filter applied)
   const records = await query;
 
-  // Get the total record count (for pagination) for the current session only
-  const totalRecords = await db('records')
+  // Get the total record count (for pagination) based on sessionId and filter (if any)
+  let totalRecordsQuery = db('records')
     .where('user_id', userId)
-    .where('session_id', sessionId) // Count only the records for the current session
-    .count('id as total');
+    .where('session_id', sessionId);  // Count only the records for the current session
 
-  // Calculate total pages
+  // Apply search filters if provided for total record count (filtered records)
+  if (searchField && searchValue) {
+    totalRecordsQuery = totalRecordsQuery.whereRaw('JSON_UNQUOTE(JSON_EXTRACT(data, ?)) LIKE ?', [`$.${searchField}`, `${searchValue}%`]);
+  }
+
+  // Get the total count of records (filtered or unfiltered)
+  const totalRecords = await totalRecordsQuery.count('id as total');
+
+  // Calculate total pages (based on filtered or unfiltered records)
   const totalPages = Math.ceil(totalRecords[0].total / perPage);
 
   // Extract valid fields dynamically from the first record's data (if available)
@@ -112,8 +107,8 @@ exports.fetchRecords = async (userId, { sessionId, searchField, searchValue, pag
 
   return { 
     records,
-    totalRecords: totalRecords[0].total,
-    totalPages,
+    totalRecords: totalRecords[0].total,  // Correct total count of records (filtered or unfiltered)
+    totalPages,                           // Correct total pages based on filtered or unfiltered records
     currentPage: page,
     validFields 
   };
