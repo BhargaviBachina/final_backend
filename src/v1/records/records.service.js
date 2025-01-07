@@ -1,4 +1,4 @@
-const db = require('../../../../config/knex');
+const db = require('../../../config/knex');
 const fs = require('fs');
 const csv = require('csv-parser');
 const { v4: uuidv4 } = require('uuid');

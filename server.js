@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const { errorHandler } = require('./src/appraisal/helpers/errorHandler');
+const { errorHandler } = require('./src/helpers/errorHandler');
 
 require('dotenv').config(); // Load environment variables
 
@@ -10,10 +10,13 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Routes
-const authRoutes = require('./src/appraisal/v1/auth/auth.routes');
-const recordsRoutes = require('./src/appraisal/v1/records/records.routes');
+const authRoutes = require('./src/v1/auth/auth.routes');
+const recordsRoutes = require('./src/v1/records/records.routes');
+const fileRoutes = require('./src/v1/records/file.routes');
+
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/records', recordsRoutes);
+app.use('/api/v1/files', fileRoutes);
 
 // Error Handling Middleware
 app.use(errorHandler);
