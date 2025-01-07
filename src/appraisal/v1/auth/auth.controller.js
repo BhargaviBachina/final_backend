@@ -1,6 +1,6 @@
-const authService = require('../services/auth.service');
-const { sendResponse } = require('../../../utils/responseHelper');
-const { registerSchema, loginSchema, resetPasswordSchema } = require('../validations/auth.validation');
+const authService = require('./auth.service');
+const { sendResponse } = require('../../utils/responseHelper');
+const { registerSchema, loginSchema, resetPasswordSchema } = require('./validations/auth.validation');
 
 exports.register = (req, res) => {
   const { error, value } = registerSchema.validate(req.body);

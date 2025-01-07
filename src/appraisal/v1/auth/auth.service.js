@@ -1,5 +1,5 @@
-const db = require('../../../../../config/knex');
-const { hashPassword, comparePassword, generateToken } = require('../utils/auth.utils');
+const db = require('../../../../config/knex');
+const { hashPassword, comparePassword, generateToken } = require('./auth.utils');
 const fs = require('fs');
 
 

@@ -1,5 +1,5 @@
-const recordsService = require('../services/records.service');
-const { sendResponse } = require('../../../utils/responseHelper');
+const recordsService = require('./records.service');
+const { sendResponse } = require('../../utils/responseHelper');
 
 exports.uploadCSV = async (req, res) => {
   try {
