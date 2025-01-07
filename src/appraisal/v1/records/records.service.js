@@ -2,22 +2,69 @@ const db = require('../../../../config/knex');
 const fs = require('fs');
 const csv = require('csv-parser');
 const { v4: uuidv4 } = require('uuid');
-const { parseCSV } = require('./records.utils');  // Import the parseCSV function from records.utils.js
+const { parseCSV } = require('./records.utils');
+
+
+// Helper function to sanitize field names
+const sanitizeFieldName = (fieldName) => {
+  // Remove leading/trailing spaces and replace spaces with underscores
+  return fieldName.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+};
+
+// Helper function to sanitize field values
+const sanitizeFieldValue = (value) => {
+  if (value === null || value === undefined) {
+    return ''; // Or handle with a default value
+  }
+  
+  // Remove any leading/trailing spaces
+  value = value.trim();
+  
+  // Handle different types
+  if (!isNaN(value)) {
+    return parseFloat(value);  // Convert strings that are numbers into actual numbers
+  }
+
+  // Handle boolean values
+  if (value.toLowerCase() === 'true') return true;
+  if (value.toLowerCase() === 'false') return false;
+
+  // Handle dates (using a standard date format like YYYY-MM-DD)
+  const date = new Date(value);
+  if (!isNaN(date.getTime())) {
+    return date.toISOString().split('T')[0]; // Convert date to YYYY-MM-DD
+  }
+
+  // Return the value as a string if none of the above
+  return value;
+};
 
 exports.processCSV = async (file, userId) => {
   const sessionId = uuidv4();  
 
   const records = await parseCSV(file.path);
 
-  // Format records into the required structure before inserting them into the DB
-  const formattedRecords = records.map((row) => ({
-    user_id: userId,
-    session_id: sessionId,
-    timestamp: new Date(),
-    data: JSON.stringify(row),  // Convert each row to JSON string
-  }));
+  // Format and sanitize records into the required structure before inserting them into the DB
+  const formattedRecords = records.map((row) => {
+    const sanitizedRow = {};
 
-  // Insert records into the database
+    // Iterate through each field in the row, sanitize it, and map to a new object
+    Object.keys(row).forEach((fieldName) => {
+      // Sanitize the field name
+      const sanitizedFieldName = sanitizeFieldName(fieldName);
+      // Sanitize the field value
+      sanitizedRow[sanitizedFieldName] = sanitizeFieldValue(row[fieldName]);
+    });
+
+    return {
+      user_id: userId,
+      session_id: sessionId,
+      timestamp: new Date(),
+      data: JSON.stringify(sanitizedRow),  // Convert sanitized row to JSON string
+    };
+  });
+
+  // Insert sanitized records into the database
   await db('records').insert(formattedRecords);
 
   // Clean up the uploaded file after processing
@@ -25,6 +72,29 @@ exports.processCSV = async (file, userId) => {
 
   return { sessionId };  // Return the sessionId for the frontend to store in localStorage
 };
+
+
+// exports.processCSV = async (file, userId) => {
+//   const sessionId = uuidv4();  
+
+//   const records = await parseCSV(file.path);
+
+//   // Format records into the required structure before inserting them into the DB
+//   const formattedRecords = records.map((row) => ({
+//     user_id: userId,
+//     session_id: sessionId,
+//     timestamp: new Date(),
+//     data: JSON.stringify(row),  // Convert each row to JSON string
+//   }));
+
+//   // Insert records into the database
+//   await db('records').insert(formattedRecords);
+
+//   // Clean up the uploaded file after processing
+//   fs.unlinkSync(file.path);
+
+//   return { sessionId };  // Return the sessionId for the frontend to store in localStorage
+// };
 
 // exports.fetchRecords = async (userId, { sessionId, searchField, searchValue, page = 1, perPage = 10 }) => {
 //   // If no sessionId is passed, get the most recent sessionId for the user
@@ -155,18 +225,21 @@ exports.fetchRecords = async (userId, { sessionId, searchField, searchValue, pag
     const isBoolean = searchValue.toLowerCase() === 'true' || searchValue.toLowerCase() === 'false';
 
     // Escape the field name for JSON path in case it contains spaces or special characters
-    const escapedSearchField = searchField.split(' ').join('\\ ');  // Escape spaces in the field name
+    const escapedSearchField = searchField.replace(/[^a-zA-Z0-9_]/g, '\\$&');  // Escape everything except alphanumeric characters and underscores
+
+    // Handle case-insensitive comparison by converting both to lowercase
+    const loweredSearchValue = searchValue.toLowerCase();  // Convert the search value to lowercase
 
     if (isBoolean) {
       // Handle boolean search values
-      const boolValue = searchValue.toLowerCase() === 'true';
-      query = query.whereRaw('JSON_UNQUOTE(JSON_EXTRACT(data, ?)) = ?', [`$.${escapedSearchField}`, boolValue]);
+      const boolValue = loweredSearchValue === 'true';
+      query = query.whereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(data, ?))) = LOWER(?)', [`$.${escapedSearchField}`, boolValue]);
     } else if (isNumber) {
       // Handle number search values
       query = query.whereRaw('JSON_UNQUOTE(JSON_EXTRACT(data, ?)) = ?', [`$.${escapedSearchField}`, parseFloat(searchValue)]);
     } else {
-      // Handle string search values
-      query = query.whereRaw('JSON_UNQUOTE(JSON_EXTRACT(data, ?)) LIKE ?', [`$.${escapedSearchField}`, `${searchValue}%`]);
+      // Handle string search values (case-insensitive)
+      query = query.whereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(data, ?))) LIKE LOWER(?)', [`$.${escapedSearchField}`, `${loweredSearchValue}%`]);
     }
   }
 
@@ -186,15 +259,17 @@ exports.fetchRecords = async (userId, { sessionId, searchField, searchValue, pag
     const isNumber = !isNaN(searchValue);
     const isBoolean = searchValue.toLowerCase() === 'true' || searchValue.toLowerCase() === 'false';
 
-    const escapedSearchField = searchField.split(' ').join('\\ ');  // Escape spaces in the field name
+    const escapedSearchField = searchField.replace(/[^a-zA-Z0-9_]/g, '\\$&');  // Escape everything except alphanumeric characters and underscores
+
+    const loweredSearchValue = searchValue.toLowerCase();  // Convert the search value to lowercase
 
     if (isBoolean) {
-      const boolValue = searchValue.toLowerCase() === 'true';
-      totalRecordsQuery = totalRecordsQuery.whereRaw('JSON_UNQUOTE(JSON_EXTRACT(data, ?)) = ?', [`$.${escapedSearchField}`, boolValue]);
+      const boolValue = loweredSearchValue === 'true';
+      totalRecordsQuery = totalRecordsQuery.whereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(data, ?))) = LOWER(?)', [`$.${escapedSearchField}`, boolValue]);
     } else if (isNumber) {
       totalRecordsQuery = totalRecordsQuery.whereRaw('JSON_UNQUOTE(JSON_EXTRACT(data, ?)) = ?', [`$.${escapedSearchField}`, parseFloat(searchValue)]);
     } else {
-      totalRecordsQuery = totalRecordsQuery.whereRaw('JSON_UNQUOTE(JSON_EXTRACT(data, ?)) LIKE ?', [`$.${escapedSearchField}`, `${searchValue}%`]);
+      totalRecordsQuery = totalRecordsQuery.whereRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(data, ?))) LIKE LOWER(?)', [`$.${escapedSearchField}`, `${loweredSearchValue}%`]);
     }
   }
 
